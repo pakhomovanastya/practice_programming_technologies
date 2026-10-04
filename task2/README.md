@@ -102,10 +102,19 @@ Python - нельзя использовать `collections.deque` и `list.pop(
 ### Структура `UserQueue`
 
 Своя очередь на `list` с индексом головы `first_index`:
+`self.data` - список времён, когда запросы были пропущены.
+`self.first_index` - индекс первого живого элемента в data
+(мы не удаляем элементы из data физически, вместо этого двигаем first_index вправо. всё, что левее first_index, — мёртвое (вышло из окна). всё, что правее или равно — живое)
+
+- `remove_firsts_index` - двигает first_index вправо, пока не дойдёт до живого элемента. (это амортизированное O(1): каждый элемент сдвигает first_index ровно один раз за всю жизнь. Суммарно по всем вызовам — не больше n итераций. Значит, в среднем на запрос — O(1).)
 
 - `collections.deque` и `list.pop(0)` по условию задачи они
 запрещены. Кроме того, `list.pop(0)` сдвигает все элементы влево — это O(n)
 на каждое удаление, что не даёт амортизированного O(1).
+
+- dikt_queue — словарь user_id → список UserQueue. Для каждого пользователя — свой список очередей (по одной на правило).
+
+- result — список символов A/D. В конце склеим в строку
 
 ### Амортизированное O(1)
 
@@ -141,25 +150,25 @@ class UserQueue:
 
 def solve(rules: list[list[int]], users: list[int], times: list[int]) -> str:
     # храним ключём номер пользователя а значением его очередь
-    dikt_queue = {}
-    result = []
+    dikt_queue = {} # для каждого пользователя — свой список очередей (по одной на правило)
+    result = [] # список символов A/D
     for u, t in zip(users, times):
-        if u not in dikt_queue:
+        if u not in dikt_queue: # если пользователь u встретился впервые создаём для него пустой список
             dikt_queue[u] = []
 
-            for _ in rules:
+            for _ in rules: #не важно значение, просто повтори len(rules) раз. У нас 1–3 правила, значит 1–3 очереди
                 dikt_queue[u].append(UserQueue())
-        queues = dikt_queue[u]
-        i = 0
+        queues = dikt_queue[u] # список очередей для этого пользователя (длина = число правил)
+        i = 0 # индекс текущей очереди
         allowed = True
         for r1 in rules:
-            k, w = r1
+            k, w = r1 # распаковываем правило [k, w] в две переменные
             # достаём нужную очередь под это правило
             queue = queues[i]
             queue.remove_firsts_index(t - w)
-            if queue.size() >= k:
+            if queue.size() >= k: # если живых элементов стало >= k, правило нарушено
                 allowed = False
-            i += 1
+            i += 1 # к следующему правилу
         if allowed:
             result.append("A")
             for q in queues:
